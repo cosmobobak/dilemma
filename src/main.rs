@@ -1,22 +1,30 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 
-use rules::{Player, run_match, GameParameters};
+use std::collections::HashMap;
 
-mod rules;
-mod premades;
+use rules::{Player, tournament};
+
 mod external;
+mod premades;
+mod rules;
 
 const INTERNAL_PREFIX_CHAR: char = '~';
 
 fn parse_program_id(program_id: &str) -> Result<Box<dyn Player>, String> {
     if program_id.starts_with(INTERNAL_PREFIX_CHAR) {
-        match program_id.trim_start_matches(INTERNAL_PREFIX_CHAR).replace('-', "_").as_str() {
-            "always_defect" => return Ok(Box::new(premades::AlwaysDefect)),
-            "always_cooperate" => return Ok(Box::new(premades::AlwaysCooperate)),
-            "grim_trigger" => return Ok(Box::<premades::GrimTrigger>::default()),
-            "tit_for_tat" => return Ok(Box::new(premades::TitForTat)),
+        match program_id
+            .trim_start_matches(INTERNAL_PREFIX_CHAR)
+            .replace('-', "_")
+            .as_str()
+        {
+            "always_defect"         => return Ok(Box::new(premades::AlwaysDefect)),
+            "always_cooperate"      => return Ok(Box::new(premades::AlwaysCooperate)),
+            "grim_trigger"          => return Ok(Box::<premades::GrimTrigger>::default()),
+            "tit_for_tat"           => return Ok(Box::new(premades::TitForTat)),
             "forgiving_tit_for_tat" => return Ok(Box::<premades::ForgivingTitForTat>::default()),
-            "tit_for_two_tats" => return Ok(Box::new(premades::TitForTwoTats)),
+            "tit_for_two_tats"      => return Ok(Box::new(premades::TitForTwoTats)),
+            "random"                => return Ok(Box::new(premades::Random)),
+            "simple_guesser"        => return Ok(Box::new(premades::SimpleGuesser)),
             other => return Err(format!("{other} isn't an inbuilt strategy!")),
         }
     }
@@ -32,7 +40,6 @@ fn parse_program_id(program_id: &str) -> Result<Box<dyn Player>, String> {
     let stdout = engine.stdout.take().unwrap();
 
     Ok(Box::new(external::ExePlayer::new(
-        program_id.into(),
         engine,
         stdout,
         stdin,
@@ -40,20 +47,30 @@ fn parse_program_id(program_id: &str) -> Result<Box<dyn Player>, String> {
 }
 
 fn main() {
-    let mut args = std::env::args().collect::<Vec<_>>();
-    match args.len() {
-        0 => unreachable!("How did you even do this?"),
-        1 | 2 => return eprintln!("Usage: {} <player_one> <player_two>", args[0]),
-        _ => (),
-    }
+    let mut population = vec![
+        "~always_defect".to_string(),
+        "~always_cooperate".to_string(),
+        "~grim_trigger".to_string(),
+        "~tit_for_tat".to_string(),
+        "~forgiving_tit_for_tat".to_string(),
+        "~tit_for_two_tats".to_string(),
+        "~random".to_string(),
+        "~simple_guesser".to_string(),
+    ];
 
-    let program_one = std::mem::take(&mut args[1]);
-    let program_two = std::mem::take(&mut args[2]);
+    population.extend(std::env::args().skip(1));
 
-    let mut player_one = parse_program_id(&program_one).unwrap();
-    let mut player_two = parse_program_id(&program_two).unwrap();
+    let player_map: HashMap<String, Box<dyn Player>> = population
+        .iter()
+        .map(|p| (p.to_owned(), parse_program_id(p).unwrap()))
+        .collect();
 
-    let res = run_match(&GameParameters::default(), &mut *player_one, &mut *player_two);
+    // grow each strategy to 50 individuals:
+    let population = population
+        .into_iter()
+        .flat_map(|s| vec![s; 15])
+        .collect::<Vec<_>>();
 
-    println!("match result: \n{}: {} utility\n{}: {} utility", player_one.strategy(), res.0, player_two.strategy(), res.1);
+    // run the tournament:
+    tournament(1_000, &population, &player_map);
 }
