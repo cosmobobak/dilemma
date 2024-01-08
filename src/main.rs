@@ -2,11 +2,12 @@
 
 use std::collections::HashMap;
 
-use rules::{Player, tournament};
+use rules::{tournament, Player};
 
 mod external;
 mod premades;
 mod rules;
+mod compiles;
 
 const INTERNAL_PREFIX_CHAR: char = '~';
 
@@ -17,14 +18,14 @@ fn parse_program_id(program_id: &str) -> Result<Box<dyn Player>, String> {
             .replace('-', "_")
             .as_str()
         {
-            "always_defect"         => return Ok(Box::new(premades::AlwaysDefect)),
-            "always_cooperate"      => return Ok(Box::new(premades::AlwaysCooperate)),
-            "grim_trigger"          => return Ok(Box::<premades::GrimTrigger>::default()),
-            "tit_for_tat"           => return Ok(Box::new(premades::TitForTat)),
+            "always_defect" => return Ok(Box::new(premades::AlwaysDefect)),
+            "always_cooperate" => return Ok(Box::new(premades::AlwaysCooperate)),
+            "grim_trigger" => return Ok(Box::<premades::GrimTrigger>::default()),
+            "tit_for_tat" => return Ok(Box::new(premades::TitForTat)),
             "forgiving_tit_for_tat" => return Ok(Box::<premades::ForgivingTitForTat>::default()),
-            "tit_for_two_tats"      => return Ok(Box::new(premades::TitForTwoTats)),
-            "random"                => return Ok(Box::new(premades::Random)),
-            "simple_guesser"        => return Ok(Box::new(premades::SimpleGuesser)),
+            "tit_for_two_tats" => return Ok(Box::new(premades::TitForTwoTats)),
+            "random" => return Ok(Box::new(premades::Random)),
+            "simple_guesser" => return Ok(Box::new(premades::SimpleGuesser)),
             other => return Err(format!("{other} isn't an inbuilt strategy!")),
         }
     }
@@ -39,11 +40,7 @@ fn parse_program_id(program_id: &str) -> Result<Box<dyn Player>, String> {
     let stdin = engine.stdin.take().unwrap();
     let stdout = engine.stdout.take().unwrap();
 
-    Ok(Box::new(external::ExePlayer::new(
-        engine,
-        stdout,
-        stdin,
-    )))
+    Ok(Box::new(external::ExePlayer::new(engine, stdout, stdin)))
 }
 
 fn main() {
@@ -65,12 +62,25 @@ fn main() {
         .map(|p| (p.to_owned(), parse_program_id(p).unwrap()))
         .collect();
 
-    // grow each strategy to 50 individuals:
+    // grow each strategy to multiple individuals:
     let population = population
         .into_iter()
-        .flat_map(|s| vec![s; 15])
+        .flat_map(|s| vec![s; 50])
         .collect::<Vec<_>>();
 
     // run the tournament:
-    tournament(1_000, &population, &player_map);
+    let utilities = tournament(1, &population, &player_map);
+
+    let mut utilities = utilities.into_iter().collect::<Vec<_>>();
+    utilities.sort_by(|(_, a), (_, b)| f64::total_cmp(b, a));
+
+    let msl = utilities.iter().map(|(n, _)| n.len()).max().unwrap();
+    let mul = utilities
+        .iter()
+        .map(|(_, u)| u.to_string().len())
+        .max()
+        .unwrap();
+    for (strategy, utility) in utilities {
+        println!("{strategy:<msl$} achieved {utility:<mul$} total utility.");
+    }
 }

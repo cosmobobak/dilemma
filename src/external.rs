@@ -1,6 +1,10 @@
-use std::{io::{BufRead, Write, BufReader}, process::{Child, ChildStdout, ChildStdin}, sync::Mutex};
+use std::{
+    io::{BufRead, BufReader, Write},
+    process::{Child, ChildStdin, ChildStdout},
+    sync::Mutex,
+};
 
-use crate::rules::{Player, Choice};
+use crate::rules::{Choice, Player};
 
 /// A player connected to an external program.
 /// Communicates using stdin and stdout.
@@ -17,12 +21,20 @@ impl Drop for ExePlayer {
 
 impl ExePlayer {
     pub fn new(process: Child, stdout: ChildStdout, stdin: ChildStdin) -> Self {
-        Self { process, stdout_stdin: Mutex::new((BufReader::new(stdout), stdin)) }
+        Self {
+            process,
+            stdout_stdin: Mutex::new((BufReader::new(stdout), stdin)),
+        }
     }
 }
 
 impl Player for ExePlayer {
-    fn choose(&self, your_history: &[Choice], their_history: &[Choice], _: &mut fastrand::Rng) -> Choice {
+    fn choose(
+        &self,
+        your_history: &[Choice],
+        their_history: &[Choice],
+        _: &mut fastrand::Rng,
+    ) -> Choice {
         // send the history to the external program
         let mut message = String::new();
         message.push_str(&format!("{};", your_history.len()));

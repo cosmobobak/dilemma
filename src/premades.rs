@@ -55,12 +55,7 @@ impl Default for ForgivingTitForTat {
 }
 
 impl Player for ForgivingTitForTat {
-    fn choose(
-        &self,
-        _: &[Choice],
-        their_history: &[Choice],
-        rng: &mut fastrand::Rng,
-    ) -> Choice {
+    fn choose(&self, _: &[Choice], their_history: &[Choice], rng: &mut fastrand::Rng) -> Choice {
         let Some(most_recent_opponent_action) = their_history.last() else {
             return Choice::Cooperate;
         };
